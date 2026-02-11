@@ -1,0 +1,27 @@
+# Dataset directories (exclude - too large)
+thermal ds-20260208T133253Z-1-001/
+thermal*/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS files
+.DS_Store
+
+# Uploads directory
+uploads/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/

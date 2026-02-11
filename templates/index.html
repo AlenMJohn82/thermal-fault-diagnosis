@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thermal Fault Diagnosis</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔥 Thermal Fault Diagnosis System</h1>
+            <p class="subtitle">Physics-Guided Deep Learning for Motor Fault Classification</p>
+        </header>
+
+        <div class="upload-section">
+            <div class="upload-box" id="uploadBox">
+                <input type="file" id="fileInput" accept="image/*" hidden>
+                <div class="upload-content">
+                    <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                    </svg>
+                    <p class="upload-text">Drag & drop thermal image here</p>
+                    <p class="upload-subtext">or click to browse</p>
+                    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                        Select Image
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="results-section" id="resultsSection" style="display: none;">
+            <div class="result-grid">
+                <div class="result-card">
+                    <h3>Prediction Result</h3>
+                    <div class="prediction-box">
+                        <div class="fault-label" id="faultLabel">-</div>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" id="confidenceFill"></div>
+                        </div>
+                        <p class="confidence-text">Confidence: <span id="confidenceValue">-</span></p>
+                        <p class="reliability-text">Physics Reliability: <span id="reliabilityValue">-</span></p>
+                    </div>
+                </div>
+
+                <div class="result-card">
+                    <h3>Hotspot Visualization</h3>
+                    <div class="viz-box">
+                        <img id="vizImage" src="" alt="Hotspot visualization">
+                    </div>
+                </div>
+            </div>
+
+            <div class="probabilities-card">
+                <h3>All Class Probabilities</h3>
+                <div class="prob-grid" id="probGrid"></div>
+            </div>
+        </div>
+
+        <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+            <div class="spinner"></div>
+            <p>Analyzing thermal image...</p>
+        </div>
+    </div>
+
+    <script>
+        const uploadBox = document.getElementById('uploadBox');
+        const fileInput = document.getElementById('fileInput');
+        const resultsSection = document.getElementById('resultsSection');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+
+        // Drag and drop functionality
+        uploadBox.addEventListener('click', () => fileInput.click());
+        
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.classList.add('drag-over');
+        });
+
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.classList.remove('drag-over');
+        });
+
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                handleFile(file);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        });
+
+        function handleFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            loadingOverlay.style.display = 'flex';
+            resultsSection.style.display = 'none';
+
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+
+                displayResults(data);
+                loadingOverlay.style.display = 'none';
+                resultsSection.style.display = 'block';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Prediction failed: ' + error.message);
+                loadingOverlay.style.display = 'none';
+            });
+        }
+
+        function displayResults(data) {
+            // Update prediction
+            document.getElementById('faultLabel').textContent = data.predicted_class;
+            const confidence = (data.confidence * 100).toFixed(1);
+            document.getElementById('confidenceValue').textContent = confidence + '%';
+            document.getElementById('confidenceFill').style.width = confidence + '%';
+            
+            const reliability = (data.physics_reliability * 100).toFixed(1);
+            document.getElementById('reliabilityValue').textContent = reliability + '%';
+
+            // Update visualization
+            document.getElementById('vizImage').src = 'data:image/png;base64,' + data.visualization;
+
+            // Update probabilities
+            const probGrid = document.getElementById('probGrid');
+            probGrid.innerHTML = '';
+            
+            const sortedProbs = Object.entries(data.all_probabilities)
+                .sort((a, b) => b[1] - a[1]);
+
+            sortedProbs.forEach(([className, prob]) => {
+                const probItem = document.createElement('div');
+                probItem.className = 'prob-item';
+                const percentage = (prob * 100).toFixed(1);
+                probItem.innerHTML = `
+                    <span class="prob-name">${className}</span>
+                    <div class="prob-bar">
+                        <div class="prob-bar-fill" style="width: ${percentage}%"></div>
+                    </div>
+                    <span class="prob-value">${percentage}%</span>
+                `;
+                probGrid.appendChild(probItem);
+            });
+        }
+    </script>
+</body>
+</html>
