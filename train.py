@@ -81,6 +81,43 @@ def evaluate(model, loader, criterion, device):
     return avg_loss, accuracy, all_preds, all_labels
 
 
+def filter_augmented_paths(aug_paths, aug_labels, train_basenames):
+    """
+    Filter augmented dataset to only include images whose base names 
+    are in the training set (exclude test images)
+    
+    Augmented filenames patterns: 
+    - sep_032_0.bmp (Separate Physics)
+    - 032_stoch_0.bmp (Stochastic)
+    Original filename: 032.bmp
+    """
+    filtered_paths = []
+    filtered_labels = []
+    
+    for path, label in zip(aug_paths, aug_labels):
+        basename = os.path.basename(path)
+        
+        # Extract original image ID from augmented filename
+        parts = basename.split('_')
+        
+        if basename.startswith('sep_') and len(parts) >= 3:
+            # Pattern: sep_032_0.bmp -> 032.bmp
+            original_basename = parts[1] + '.bmp'
+        elif 'stoch' in basename and len(parts) >= 3:
+            # Pattern: 032_stoch_0.bmp -> 032.bmp
+            original_basename = parts[0] + '.bmp'
+        else:
+            # Fallback: use basename as-is (for clean dataset)
+            original_basename = basename
+        
+        # Check if this original basename is in training set
+        if original_basename in train_basenames:
+            filtered_paths.append(path)
+            filtered_labels.append(label)
+    
+    return filtered_paths, filtered_labels
+
+
 def main(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
@@ -92,43 +129,73 @@ def main(args):
     path_clean = os.path.join(base_path, "IR-Motor-bmp")
     
     print("\n" + "="*50)
-    print("LOADING DATASETS")
+    print("STEP 1: SPLIT CLEAN DATA FIRST")
     print("="*50)
     
-    # Load curriculum datasets
-    sep_paths, sep_labels = load_dataset_paths(path_separate, CLASS_MAP)
-    sto_paths, sto_labels = load_dataset_paths(path_stochastic, CLASS_MAP)
+    # Load clean dataset FIRST
     clean_paths, clean_labels = load_dataset_paths(path_clean, CLASS_MAP)
+    print(f"Total clean images: {len(clean_paths)}")
     
-    print(f"Separate Physics: {len(sep_paths)} images")
-    print(f"Stochastic: {len(sto_paths)} images")
-    print(f"Clean: {len(clean_paths)} images")
-    
-    # Split clean data (80% train, 20% test) with FIXED seed for reproducibility
+    # Split clean data (80% train, 20% test) with FIXED seed
     clean_train_paths, clean_test_paths, clean_train_labels, clean_test_labels = train_test_split(
         clean_paths,
-clean_labels,
+        clean_labels,
         test_size=0.2,
         stratify=clean_labels,
-        random_state=42  # Fixed seed!
+        random_state=42  # Fixed seed for reproducibility
     )
     
-    print(f"\nClean split:")
+    print(f"\nClean data split:")
     print(f"  Train: {len(clean_train_paths)} images")
     print(f"  Test: {len(clean_test_paths)} images")
     
-    # Save test split info for user
+    # Extract basenames for filtering augmented datasets
+    train_basenames = {os.path.basename(p) for p in clean_train_paths}
+    test_basenames = {os.path.basename(p) for p in clean_test_paths}
+    
+    print(f"\n✓ Training basenames: {len(train_basenames)}")
+    print(f"✓ Test basenames: {len(test_basenames)}")
+    
+    # Save test split info
     test_split_info = {
         "test_images": clean_test_paths,
         "test_labels": [int(label) for label in clean_test_labels],
+        "test_basenames": list(test_basenames),
         "class_names": CLASS_NAMES,
-        "note": "These images were NOT seen during training - use them for inference testing"
+        "note": "These images were NEVER seen during training - not even in augmented form!"
     }
     
     test_info_file = "test_split_info.json"
     with open(test_info_file, 'w') as f:
         json.dump(test_split_info, f, indent=2)
-    print(f"\n✓ Test split info saved to: {test_info_file}")
+    print(f"✓ Test split info saved to: {test_info_file}")
+    
+    print("\n" + "="*50)
+    print("STEP 2: FILTER AUGMENTED DATASETS")
+    print("="*50)
+    
+    # Load ALL augmented data
+    sep_paths_all, sep_labels_all = load_dataset_paths(path_separate, CLASS_MAP)
+    sto_paths_all, sto_labels_all = load_dataset_paths(path_stochastic, CLASS_MAP)
+    
+    print(f"\nBefore filtering:")
+    print(f"  Separate physics: {len(sep_paths_all)} images")
+    print(f"  Stochastic: {len(sto_paths_all)} images")
+    
+    # Filter to ONLY include training images (exclude test images)
+    sep_paths, sep_labels = filter_augmented_paths(sep_paths_all, sep_labels_all, train_basenames)
+    sto_paths, sto_labels = filter_augmented_paths(sto_paths_all, sto_labels_all, train_basenames)
+    
+    print(f"\nAfter filtering (test images removed):")
+    print(f"  Separate physics: {len(sep_paths)} images")
+    print(f"  Stochastic: {len(sto_paths)} images")
+    
+    print(f"\n✓ Test images excluded from augmented datasets!")
+    print(f"✓ No data leakage - test set is completely unseen!")
+    
+    print("\n" + "="*50)
+    print("STEP 3: CREATE DATASETS")
+    print("="*50)
     
     # Create datasets
     sep_dataset = ThermalDataset(sep_paths, sep_labels, img_size=args.img_size)
@@ -142,6 +209,12 @@ clean_labels,
     clean_train_loader = DataLoader(clean_train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=2)
     clean_test_loader = DataLoader(clean_test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=2)
     
+    print(f"✓ Datasets created")
+    print(f"  Stage 1 loader: {len(sep_loader)} batches")
+    print(f"  Stage 2 loader: {len(sto_loader)} batches")
+    print(f"  Stage 3 train loader: {len(clean_train_loader)} batches")
+    print(f"  Test loader: {len(clean_test_loader)} batches")
+    
     # Initialize model
     model = PhysicsGuidedCNN(num_classes=11).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -150,6 +223,7 @@ clean_labels,
     print("\n" + "="*50)
     print("STAGE 1: SEPARATE PHYSICS AUGMENTATIONS")
     print("="*50)
+    print(f"Training on {len(sep_paths)} augmented images (EXCLUDING test set)")
     
     for epoch in range(args.epochs_stage1):
         loss = train_one_epoch(model, sep_loader, optimizer, criterion, device)
@@ -166,6 +240,7 @@ clean_labels,
     print("\n" + "="*50)
     print("STAGE 2: COMBINED STOCHASTIC AUGMENTATIONS")
     print("="*50)
+    print(f"Training on {len(sto_paths)} augmented images (EXCLUDING test set)")
     
     for epoch in range(args.epochs_stage2):
         loss = train_one_epoch(model, sto_loader, optimizer, criterion, device)
@@ -182,6 +257,7 @@ clean_labels,
     print("\n" + "="*50)
     print("STAGE 3: CLEAN DATA FINE-TUNING")
     print("="*50)
+    print(f"Training on {len(clean_train_paths)} clean images (EXCLUDING test set)")
     
     for epoch in range(args.epochs_stage3):
         loss = train_one_epoch(model, clean_train_loader, optimizer, criterion, device)
@@ -194,8 +270,10 @@ clean_labels,
     
     # Evaluate on test set
     print("\n" + "="*50)
-    print("FINAL EVALUATION ON TEST SET")
+    print("FINAL EVALUATION ON COMPLETELY UNSEEN TEST SET")
     print("="*50)
+    print(f"Evaluating on {len(clean_test_paths)} test images")
+    print("(These were NEVER seen - not even in augmented form!)")
     
     test_loss, test_acc, preds, labels = evaluate(model, clean_test_loader, criterion, device)
     
@@ -206,17 +284,19 @@ clean_labels,
     print(classification_report(labels, preds, target_names=[CLASS_NAMES[i] for i in range(11)]))
     
     print("\n" + "="*50)
-    print("TRAINING COMPLETE!")
+    print("TRAINING COMPLETE - NO DATA LEAKAGE!")
     print("="*50)
     print(f"Final model: {final_model_path}")
     print(f"Test images list: {test_info_file}")
+    print("\n✓ Test set was completely unseen in all training stages")
+    print("✓ True generalization performance achieved")
     print("\nNext steps:")
-    print("1. Check test_split_info.json for images to use for inference testing")
+    print("1. Check test_split_info.json for truly unseen test images")
     print("2. Run the web UI: python app.py")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train thermal fault classification model")
+    parser = argparse.ArgumentParser(description="Train thermal fault classification model WITHOUT data leakage")
     parser.add_argument("--data_path", type=str, default="thermal ds-20260208T133253Z-1-001/thermal ds",
                         help="Path to dataset directory")
     parser.add_argument("--epochs_stage1", type=int, default=20,
