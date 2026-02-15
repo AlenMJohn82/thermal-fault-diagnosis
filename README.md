@@ -1,268 +1,140 @@
-# 🔥 Thermal Fault Diagnosis System
+# 🔥 Physics-Guided Robust Thermal Fault Diagnosis
 
-Physics-Guided Deep Learning for Motor Fault Classification using Thermal Infrared Images.
+**A Physics-Guided Convolutional Neural Network (PG-CNN) for robust motor fault classification in noisy industrial environments.**
 
-![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
+![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Robustness](https://img.shields.io/badge/Robustness-High-brightgreen)
 
 ## 📖 Overview
 
-This project implements a **physics-guided CNN** for detecting motor faults from thermal infrared images. It combines deep learning with domain knowledge through:
+Standard deep learning models often fail when deployed in harsh industrial environments with sensor noise. This project implements a **Physics-Guided CNN** that integrates thermal domain knowledge (temperature statistics, hotspot morphology) to ensuring reliable fault diagnosis even when image quality degrades.
 
-- ✨ **Physics-guided feature fusion** - Integrates visual patterns with thermal physics
-- 🎓 **Curriculum learning** - Progressive training from augmented to real data
-- 🎯 **100% test accuracy** achieved on held-out images
-- 🌐 **Interactive web UI** for easy inference and visualization
+### ✨ Key Innovations
+- **🛡️ Noise Robustness**: Maintains **100% accuracy** at noise levels where standard ResNet18 drops to **31%**.
+- **🧠 Adaptive Fusion**: Automatically switches trust to mechanical physics features when visual textures are noisy.
+- **🎓 Curriculum Learning**: 3-stage progressive training logic (Augmented → Stochastic → Real).
+- **🚀 100% Clean Accuracy**: Perfect classification on held-out test data.
 
-## 🚀 Quick Start (For New Developers)
+---
 
-### Prerequisites
+## 📊 Key Result: Superior Robustness
 
-Make sure you have:
-- Python 3.8 or higher installed
-- (Optional) NVIDIA GPU with CUDA for faster training
-- Git installed
+While both our model and baseline methods achieve 100% accuracy on clean data, our **Physics-Guided approach** is drastically more stable under simulated sensor noise.
 
-### 1. Clone the Repository
+| Noise Level ($\sigma$) | Physics-Guided (Ours) | Baseline ResNet18 | **Improvement** |
+| :---: | :---: | :---: | :---: |
+| **0.00 (Clean)** | **100.00%** | **100.00%** | Tie |
+| **0.05 (Slight)** | **100.00%** | 31.08% | **+68.92% (Massive)** |
+| **0.10 (Moderate)**| **72.97%** | 25.68% | **+47.30% (Massive)** |
+
+---
+
+## 🚀 Quick Start
+
+### 1. Installation
 
 ```bash
 git clone https://github.com/alenadon82/thermal-fault-diagnosis.git
 cd thermal-fault-diagnosis
-```
 
-### 2. Set Up Environment
-
-**Option A: Using Conda (Recommended)**
-
-```bash
-# Create conda environment
+# Create environment
 conda create -n thermal python=3.10 -y
 conda activate thermal
-
-# Install dependencies
-pip install torch torchvision opencv-python numpy scikit-learn Flask
-```
-
-**Option B: Using pip + venv**
-
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Download the Dataset
+### 2. Dataset Setup
+The dataset is too large for GitHub. Only the code and trained models are included.
+To train from scratch, place your dataset in:
+`thermal ds-20260208T133253Z-1-001/thermal ds/`
 
-⚠️ **Important**: The dataset is NOT included in this repository (too large for GitHub).
+### 3. Running Inference (Web UI)
 
-You need to download the thermal images dataset separately and place it in this structure:
-
-```
-thermal-fault-diagnosis/
-├── thermal ds-20260208T133253Z-1-001/
-│   └── thermal ds/
-│       ├── Augmented_Separate_Physics_Dataset/
-│       ├── Augmented_Combined_Stochastic/
-│       └── IR-Motor-bmp/
-│           ├── A10/
-│           ├── A30/
-│           └── ... (11 fault class folders)
-└── (other project files)
-```
-
-Contact the project owner for dataset access.
-
-### 4. Use Pre-trained Model OR Train Your Own
-
-**Option A: Use Pre-trained Model** (Included in repo)
-
-The repository includes trained model weights:
-- `thermal_model_final.pth` - Ready to use for inference
-- Skip to step 5 to run the web UI!
-
-**Option B: Train From Scratch**
-
-If you have the dataset, train your own model:
-
-```bash
-python train.py
-```
-
-Training takes ~30-40 minutes on GPU (2-3 hours on CPU). You'll see:
-
-```
-Stage 1: SEPARATE PHYSICS AUGMENTATIONS
-Epoch 1/20 | Loss: 0.3842
-...
-Stage 2: COMBINED STOCHASTIC AUGMENTATIONS
-...
-Stage 3: CLEAN DATA FINE-TUNING
-...
-✓ Final model saved to: thermal_model_final.pth
-Test Accuracy: 100.00%
-```
-
-### 5. Run the Web UI
+Use the pre-trained model (`thermal_model_final.pth`) to classify images immediately.
 
 ```bash
 python app.py
 ```
+Open **http://localhost:5000** in your browser.
 
-Open your browser to: **http://localhost:5000**
+---
 
-You'll see a beautiful purple gradient interface where you can:
-- 📤 Upload thermal images (drag & drop)
-- 🔥 Get instant fault predictions
-- 📊 See confidence scores
-- 🎨 View hotspot visualizations
+## 🧪 Reproducing Research Results
 
-### 6. Test with Sample Images
-
-If you have `test_split_info.json`, it contains paths to test images:
+### A. Verify Classification Performance (Clean Data)
+Run the detailed evaluation script to generate the confusion matrix and classification report.
 
 ```bash
-# View test images that weren't seen during training
-cat test_split_info.json
+python evaluate_detailed.py
+```
+**Output**: `classification_metrics.txt` and `confusion_matrix.png`
+
+### B. Verify Noise Robustness (The "Stress Test")
+Run the noise experiment to see the Physics-Guided model in action against a baseline.
+
+```bash
+python noise_test.py
+```
+**Output**: `noise_robustness_results.json` containing accuracy at noise levels 0.0 to 0.5.
+
+### C. Generate Paper Plot
+Visualize the robustness gap between our model and the baseline.
+
+```bash
+python generate_robustness_plot.py
+```
+**Output**: `noise_robustness_plot.png` (Figure 3 in the paper).
+
+---
+
+## ⚙️ Training From Scratch
+
+If you have the dataset, you can retrain the model using the 3-stage curriculum learning strategy.
+
+```bash
+# Train with default settings
+python train.py
+
+# Custom training
+python train.py --epochs_stage1 30 --lr 0.001
 ```
 
-Upload any of these images to the web UI to verify the model!
+**Note**: The training script `train.py` automatically handles **Data Leakage Prevention** by filtering augmented images that correspond to the test set.
 
-## 📚 How It Works
-
-### The 11 Fault Classes
-
-The system can detect these motor conditions:
-
-| Class | Description | Thermal Pattern |
-|-------|-------------|-----------------|
-| **A10** | Phase A fault - 10% severity | Small hotspot in phase A winding |
-| **A30** | Phase A fault - 30% severity | Medium hotspot in phase A |
-| **A50** | Phase A fault - 50% severity | Large hotspot in phase A |
-| **A&C10** | Phase A & C fault - 10% | Two small hotspots |
-| **A&C30** | Phase A & C fault - 30% | Two medium hotspots |
-| **A&B50** | Phase A & B fault - 50% | Two large hotspots |
-| **A&C&B10** | All phases - 10% | Multiple small hotspots |
-| **A&C&B30** | All phases - 30% | Multiple medium hotspots |
-| **Fan** | Fan failure | Overall heat buildup |
-| **Rotor-0** | Rotor fault | Rotating hotspot pattern |
-| **Noload** | No load | Uniform low temperature |
-
-### Architecture
-
-```
-Input Image (224×224)
-    ↓
-ResNet18 Backbone ──────────┐
-    ↓                        │
-Visual Features          Physics Features
-    ↓                    (area, ΔT, std)
-    ↓                        ↓
-    ↓                  Reliability Net
-    ↓                        ↓
-    └──→ Fusion (α-weighted) ──→ Classifier → Prediction
-```
-
-**Key Innovation**: The model learns how much to trust physics vs. visual features!
-
-### Training Process (Curriculum Learning)
-
-```
-Stage 1 (20 epochs)          Stage 2 (20 epochs)          Stage 3 (10 epochs)
-Augmented Physics Data   →   Stochastic Augmented    →    Clean Real Data
-(easier patterns)            (moderate difficulty)        (real-world)
-```
-
-## 🎯 Performance
-
-- **Test Accuracy**: 100% (74 held-out images)
-- **Inference Speed**: < 1 second per image
-- **Model Size**: 43 MB
-- **All 11 classes**: Perfect precision, recall, F1-score
+---
 
 ## 📁 Project Structure
 
 ```
 thermal-fault-diagnosis/
-├── train.py                    # Training script with curriculum learning
-├── app.py                      # Flask web server for inference
-├── model.py                    # PhysicsGuidedCNN architecture
-├── dataset.py                  # Data loading & preprocessing
-├── requirements.txt            # Python dependencies
-├── thermal_model_final.pth     # Trained model weights (43 MB)
-├── test_split_info.json        # Test images list
-├── templates/
-│   └── index.html              # Web UI frontend
-└── static/
-    └── style.css               # UI styling
+├── train.py                    # Main training script (Curriculum Learning)
+├── model.py                    # PG-CNN Architecture Definition
+├── dataset.py                  # Physics Feature Extraction Logic
+├── noise_test.py               # Robustness Experiment Script
+├── evaluate_detailed.py        # Classification Metrics Script
+├── app.py                      # Web Interface (Flask)
+├── thermal_model_final.pth     # Trained Model Weights
+├── test_split_info.json        # List of Test Images (for reproducibility)
+└── templates/
+    └── index.html              # UI Frontend
 ```
-
-## 🛠️ Advanced Usage
-
-### Custom Training Parameters
-
-```bash
-# Adjust epochs and batch size
-python train.py --epochs_stage1 30 --epochs_stage2 30 --epochs_stage3 15 --batch_size 16
-
-# Use CPU only (no GPU)
-python train.py --device cpu
-```
-
-### Using the Model Programmatically
-
-```python
-import torch
-from model import PhysicsGuidedCNN
-from dataset import ThermalDataset
-
-# Load model
-model = PhysicsGuidedCNN(num_classes=11)
-model.load_state_dict(torch.load('thermal_model_final.pth'))
-model.eval()
-
-# Run inference
-# (See app.py for complete example)
-```
-
-## 🐛 Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| `ModuleNotFoundError: No module named 'torch'` | Install dependencies: `pip install -r requirements.txt` |
-| `FileNotFoundError: thermal_model_final.pth` | Run `python train.py` to train the model first |
-| `CUDA out of memory` | Reduce batch size: `python train.py --batch_size 8` |
-| Web UI shows "Model not loaded" | Make sure `thermal_model_final.pth` is in the project directory |
-| Port 5000 already in use | Change port in app.py: `app.run(port=5001)` |
 
 ## 📝 Citation
 
-If you use this code in your research, please cite:
+If you use this work, please cite:
 
 ```bibtex
 @software{thermal_fault_diagnosis,
   author = {Alen Adon},
-  title = {Physics-Guided Thermal Fault Diagnosis System},
+  title = {Physics-Guided Deep Learning for Robust Thermal Fault Diagnosis},
   year = {2026},
   url = {https://github.com/alenadon82/thermal-fault-diagnosis}
 }
 ```
 
 ## 📧 Contact
-
-For questions or issues:
-- Open an issue on GitHub
-- Email: alenadon82@gmail.com
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-- ResNet18 architecture from torchvision
-- Physics-guided fusion approach based on thermal diagnostics research
-- Dataset from motor fault thermal imaging experiments
+For questions or collaboration: **alenadon82@gmail.com**
