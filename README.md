@@ -9,19 +9,19 @@
 
 ## 📖 Overview
 
-Standard deep learning models often fail when deployed in harsh industrial environments with sensor noise. This project implements a **Physics-Guided CNN** that integrates thermal domain knowledge (temperature statistics, hotspot morphology) to ensuring reliable fault diagnosis even when image quality degrades.
+Standard deep learning models often fail when deployed in harsh industrial environments with sensor noise. This project implements a **Physics-Guided CNN** that integrates thermal domain knowledge (temperature statistics, hotspot morphology) to ensure reliable fault diagnosis even when image quality degrades.
 
-### ✨ Key Innovations
-- **🛡️ Noise Robustness**: Maintains **100% accuracy** at noise levels where standard ResNet18 drops to **31%**.
-- **🧠 Adaptive Fusion**: Automatically switches trust to mechanical physics features when visual textures are noisy.
-- **🎓 Curriculum Learning**: 3-stage progressive training logic (Augmented → Stochastic → Real).
-- **🚀 100% Clean Accuracy**: Perfect classification on held-out test data.
+### ✨ Key Research Contributions
+- **� 5-Fold Cross Validation**: Achieves **100.00% ± 0.00%** accuracy across all 369 images.
+- **🛡️ OOD Robustness Pipeline**: Actively tested across 3 distribution-shift levels (Clean, Seen Artifacts, Unseen OOD Corruptions).
+- **🧠 Adaptive Fusion**: Automatically switches trust to physical morphology features when visual textures are destroyed by noise.
+- **🎓 Curriculum Learning**: 3-stage progressive training logic (Physics Aug → Artifact Enriched → Clean).
 
 ---
 
-## 📊 Key Result: Superior Robustness
+## 📊 Evaluation 1: Gaussian Noise (Stress Test)
 
-While both our model and baseline methods achieve 100% accuracy on clean data, our **Physics-Guided approach** is drastically more stable under simulated sensor noise.
+While standard models achieve 100% accuracy on clean data, our **Physics-Guided approach** is drastically more stable under simulated uniform sensor noise.
 
 | Noise Level ($\sigma$) | Physics-Guided (Ours) | Baseline ResNet18 | **Improvement** |
 | :---: | :---: | :---: | :---: |
@@ -31,12 +31,28 @@ While both our model and baseline methods achieve 100% accuracy on clean data, o
 
 ---
 
+## 📊 Evaluation 2: 3-Level OOD Robustness (New!)
+
+To truly test out-of-distribution (OOD) generalization without data leakage, we implemented a strict 70/30 split, trained the model with dynamically injected "Seen Artifacts" (Stripes, Hotspots, Drift), and tested it against completely "Unseen" corruptions.
+
+| Evaluation Level | Condition | Accuracy | Robustness Score |
+| :--- | :--- | :---: | :---: |
+| **Level 1** | Untouched Clean Test Set | **100.00%** | 1.00 |
+| **Level 2** | Seen Artifacts (Average Sev. 1-5) | **96.94%** | 0.97 |
+| **Level 3** | Unseen OOD Corruptions | **57.12%** | 0.57 |
+
+**OOD Breakdown Insights:**
+- **Highly Robust:** Occlusion (97.8%), Motion Blur (94.2%) — Physical morphology survives.
+- **Vulnerable:** Lens Condensation (47.9%), Salt/Pepper (13.3%) — Thresholds and shapes are destroyed.
+
+---
+
 ## 🚀 Quick Start
 
 ### 1. Installation
 
 ```bash
-git clone https://github.com/alenadon82/thermal-fault-diagnosis.git
+git clone https://github.com/AlenMJohn82/thermal-fault-diagnosis.git
 cd thermal-fault-diagnosis
 
 # Create environment
@@ -48,77 +64,58 @@ pip install -r requirements.txt
 ```
 
 ### 2. Dataset Setup
-The dataset is too large for GitHub. Only the code and trained models are included.
-To train from scratch, place your dataset in:
+Place the base 11-class thermal datasets into:
 `thermal ds-20260208T133253Z-1-001/thermal ds/`
 
 ### 3. Running Inference (Web UI)
 
-Use the pre-trained model (`thermal_model_final.pth`) to classify images immediately.
+Use the pre-trained models to classify images directly in your browser.
 
 ```bash
 python app.py
 ```
-Open **http://localhost:5000** in your browser.
+Open **http://localhost:5000**
 
 ---
 
 ## 🧪 Reproducing Research Results
 
-### A. Verify Classification Performance (Clean Data)
-Run the detailed evaluation script to generate the confusion matrix and classification report.
-
+### A. 5-Fold Cross-Validation
+Run the statistical validation script (trains 5 distinct models internally).
 ```bash
-python evaluate_detailed.py
+python kfold_crossval.py
 ```
-**Output**: `classification_metrics.txt` and `confusion_matrix.png`
 
-### B. Verify Noise Robustness (The "Stress Test")
-Run the noise experiment to see the Physics-Guided model in action against a baseline.
+### B. OOD Robustness Pipeline
+Train the artifact-injected robust model and immediately evaluate across all 3 stress levels.
+```bash
+python train_ood.py   # Trains the model using curriculum + artifact injection
+python eval_ood.py    # Generates the 3-level evaluation and degradation plots
+```
+**Output**: `ood_robustness_plot.png` and `ood_results_summary.json`
 
+### C. Gaussian Noise Comparison
+Compare the standard model vs. a plain ResNet baseline.
 ```bash
 python noise_test.py
-```
-**Output**: `noise_robustness_results.json` containing accuracy at noise levels 0.0 to 0.5.
-
-### C. Generate Paper Plot
-Visualize the robustness gap between our model and the baseline.
-
-```bash
 python generate_robustness_plot.py
 ```
-**Output**: `noise_robustness_plot.png` (Figure 3 in the paper).
 
 ---
 
-## ⚙️ Training From Scratch
-
-If you have the dataset, you can retrain the model using the 3-stage curriculum learning strategy.
-
-```bash
-# Train with default settings
-python train.py
-
-# Custom training
-python train.py --epochs_stage1 30 --lr 0.001
-```
-
-**Note**: The training script `train.py` automatically handles **Data Leakage Prevention** by filtering augmented images that correspond to the test set.
-
----
-
-## 📁 Project Structure
+## 📁 Core Project Structure
 
 ```
 thermal-fault-diagnosis/
-├── train.py                    # Main training script (Curriculum Learning)
+├── train_ood.py                # OOD Curriculum Training Script
+├── eval_ood.py                 # 3-Level Robustness Evaluation Script
+├── thermal_artifacts.py        # Seen/Unseen Artifact Generation Library
+├── kfold_crossval.py           # 5-Fold Statistical Validation
 ├── model.py                    # PG-CNN Architecture Definition
 ├── dataset.py                  # Physics Feature Extraction Logic
-├── noise_test.py               # Robustness Experiment Script
-├── evaluate_detailed.py        # Classification Metrics Script
-├── app.py                      # Web Interface (Flask)
-├── thermal_model_final.pth     # Trained Model Weights
-├── test_split_info.json        # List of Test Images (for reproducibility)
+├── app.py                      # Interactive Web Interface (Flask)
+├── thermal_model_final.pth     # Standard Weights (80/20)
+├── thermal_model_ood_trained.pth # OOD-Robust Weights (70/30 fixed split)
 └── templates/
     └── index.html              # UI Frontend
 ```
@@ -132,7 +129,7 @@ If you use this work, please cite:
   author = {Alen Adon},
   title = {Physics-Guided Deep Learning for Robust Thermal Fault Diagnosis},
   year = {2026},
-  url = {https://github.com/alenadon82/thermal-fault-diagnosis}
+  url = {https://github.com/AlenMJohn82/thermal-fault-diagnosis}
 }
 ```
 
